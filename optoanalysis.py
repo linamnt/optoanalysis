@@ -98,7 +98,7 @@ def bin_freezing(tables, bin_size, total):
         sums.append(bin_sum)
     sums = np.array(sums)
 
-    return freezing_bins, sums/float(bin_size)
+    return freezing_bins, sums/float(bin_size)*100
 
 def folder_freezing(directory, bin_size, total):
     '''
