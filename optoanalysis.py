@@ -6,6 +6,9 @@ Created on Tue Sep 27 10:25:21 2016
 """
 import numpy as np
 import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def read_times_txt(txt):
     '''
@@ -27,13 +30,24 @@ def folder_times(directory):
     '''
     animals = []
     tables = []
+    groupings = []
     for root, _, fn in os.walk(directory):
         for f in fn:
             fullpath = os.path.join(root, f)
-            animals.append(f.strip('.txt').lower())
-            times_all = read_times_txt(fullpath)
-            tables.append(times_all)
-    return animals, tables
+            if f.strip('.txt').lower() == 'groups':
+                with open(fullpath) as x:
+                    firstline = x.readline()
+                    group_names = firstline.strip().split(',')
+                    group_names = [i.strip().lower() for i in group_names]
+                    groupings.append(group_names)
+                    secondline = x.readline()
+                    groupings.append(secondline.strip())
+            else:
+                animals.append(f.strip('.txt').lower())
+                times_all = read_times_txt(fullpath)
+                tables.append(times_all)
+    return animals, tables, groupings
+
 
 def bin_freezing(tables, bin_size, total):
     '''
@@ -86,24 +100,24 @@ def bin_freezing(tables, bin_size, total):
 
     return freezing_bins, sums/float(bin_size)
 
-def folder_freezing(directory, bin_size, total, groupings):
+def folder_freezing(directory, bin_size, total):
     '''
     Input: directory, size of bin in seconds, total length of recording session,
-    and groupings as a list of groups based on your animal naming convention
+    and groupings as a list of groups based on your animal naming convention.
+    - The first group will be labeled as 0, the second as 1 and so forth.
     Output: numpy array of binned freezing percentages, each line is one animal
     - grouping indicated in the first column determined by groupings parameter
     - numbered coding used only because we are using numpy arrays
     '''
-    animals, tables = folder_times(directory)
+    animals, tables, groupings = folder_times(directory)
     groups = np.zeros([len(tables),(total//bin_size + 1)])
     for idx, animal in enumerate(tables):
-        for code, group in enumerate(groupings):
-            if groupings[code] in animals[idx]:
+        for code, group in enumerate(groupings[0]):
+            if group in animals[idx]:
                 freezing = bin_freezing(tables[idx], bin_size, total)
                 groups[idx][1:] = freezing[1]
                 groups[idx][0] = code
-                break
-    return groups
+    return groups, groupings[1]
 
 def groups_to_df(groups, bin_size, total, key):
     '''
@@ -113,29 +127,35 @@ def groups_to_df(groups, bin_size, total, key):
     Output: A Pandas DataFrame with records of each animal's freezing per bin
     '''
     groups = pd.DataFrame(groups,
-        columns=['Group']+np.arange(bin_size,total+bin_size,bin_size))
+        columns=['Group']+list(np.arange(bin_size,total+bin_size,bin_size)))
     #an ID must be made to associate a time point to an animal
     groups['ID'] = [i for i in groups.index]
     groups['Group'] = groups['Group'].map(key)
-    groups.melt = pd.melt(groups, id_vars=['Group', 'ID'],
+    groups_melt = pd.melt(groups, id_vars=['Group', 'ID'],
         var_name='Timepoints', value_name='Freezing')
-    return groups
+    return groups, groups_melt
 
-def plot_freezing(df, bin_size, total):
+def plot_freezing(df, bin_size, total, style='ts'):
     '''
     Input: A Pandas Dataframe from groups_to_df(), bin_size and total time
-    for x-axis generation
+    for x-axis generation, and style either 'ts' for time series, or 'bar' for
+    bar plot.
     '''
-    #so points fall into center of range it is representing
-    start = 0.5*binsize
-    end = total + binsize
-    #finish code here
+    sns.set_style('ticks')
+    assert style.lower() in ['ts', 'bar'], \
+        "Please enter a style from 'ts' for time series, or 'bar' for bar plot"
 
     plt.figure(figsize=(15,10))
     plt.xlabel('Timepoints', fontsize=20)
     plt.ylabel('Freezing', fontsize=20)
 
-    g = sns.tsplot(data=df, unit='ID', time='Timepoints', condition='Group', value='Freezing')
-    plt.legend(prop={'size':20})
-    sns.despine()
-    g.set_xticks(range(0,total+60,60))
+    if style == 'ts':
+        g = sns.tsplot(data=df, unit='ID', time='Timepoints', condition='Group', value='Freezing')
+        plt.legend(prop={'size':20})
+        sns.despine()
+        g.set_xticks(range(0,total+60,60))
+    elif style == 'bar':
+        g = sns.barplot(x='Timepoints', y='Freezing', hue='Group', data=df, ci=68, capsize=0.05)
+        sns.despine()
+        g.set_ylabel('Freezing (%)', fontsize=20)
+        g.set_xlabel('Timepoints', fontsize=20)
