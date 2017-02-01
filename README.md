@@ -1,7 +1,7 @@
 # Optogenetics Freezing Analysis
 
-![alt](src/ts_example.png)
-![alt](src/bar_example.png)
+<img src='src/ts_example.png' width='400')>
+<img src='src/bar_example.png' width='400')>
 
 This is a set of scripts to analyze and visualize freezing data generated from cyansite.cc/freeze.html where the output on the side panel is copied and pasted into a .txt file as is. You can visualize as a time series for more short time bins, or as a bar plot for larger time bins (or vice versa if you so choose, but I do wonder why you would...)
 
