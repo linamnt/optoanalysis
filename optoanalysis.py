@@ -49,6 +49,7 @@ def folder_times(directory):
     return animals, tables, groupings
 
 
+
 def bin_freezing(tables, bin_size, total):
     '''
     input: tables output from folder_times(), size of bin in seconds, and the
@@ -61,8 +62,10 @@ def bin_freezing(tables, bin_size, total):
     the bin is split such that the earlier bin is binned first, and the later
     bin is appended to the end of the list to be binned once it comes up again.
     '''
-    epochs = float(total)/bin_size
-    idx = np.arange(1, epochs+1)*bin_size
+    n_bins = float(total)/bin_size
+    idx = np.arange(1, n_bins+1)*bin_size
+    # want n_bins empty lists, append to each list freezing times that belong in
+    # each bin
     freezing_bins = []
     for i in idx:
         freezing_bins.append([])
@@ -73,16 +76,8 @@ def bin_freezing(tables, bin_size, total):
         #where bn is the top end of the bin
         #splits the freezing events into bins
         for ix, bn in enumerate(idx):
-            #for the case where an event spans more than two bins
-            if (time[1] > bn) & (time[0] < (bn-bin_size)):
-                freezing_bins[ix].append(bn - time[0])
-                #send the later portion to be binned again
-                tables.append(np.array([bn, time[1]]))
-                #break to stop looping over all other bins once we've found the
-                #correct bin(s)
-                break
             #for the case where an event spans two bins
-            elif (time[1] > bn) & ((bn-bin_size) <= time[0] < bn):
+            if (time[1] > bn) & ((bn-bin_size) <= time[0] < bn):
                 freezing_bins[ix].append(bn - time[0])
                 tables.append(np.array([bn, time[1]]))
                 break
@@ -90,15 +85,21 @@ def bin_freezing(tables, bin_size, total):
             elif (time[1] <= bn) & (time[0] >= (bn-bin_size)):
                 freezing_bins[ix].append(time[1] - time[0])
                 break
+
     sums = []
-    for ix,i in enumerate(freezing_bins):
+    for i in freezing_bins:
+        print i
         if i == []:
-            i.append(0)
-        bin_sum = sum(i)
-        sums.append(bin_sum)
+            #therefore there were no freezing episodes during that bin
+            sums.append(0)
+        else:
+            bin_sum = sum(i)
+            sums.append(bin_sum)
     sums = np.array(sums)
 
     return freezing_bins, sums/float(bin_size)*100
+
+##perhaps split bin_freezing into two functions to give either freezing bins or percentages
 
 def folder_freezing(directory, bin_size, total):
     '''
@@ -110,18 +111,18 @@ def folder_freezing(directory, bin_size, total):
     - numbered coding used only because we are using numpy arrays
     '''
     animals, tables, groupings = folder_times(directory)
-    groups = np.zeros([len(tables),(total//bin_size + 1)])
+    results = np.zeros([len(tables),(total//bin_size + 1)])
     for idx, animal in enumerate(tables):
         for code, group in enumerate(groupings[0]):
             if group in animals[idx]:
                 freezing = bin_freezing(tables[idx], bin_size, total)
-                groups[idx][1:] = freezing[1]
-                groups[idx][0] = code
-    return groups, groupings[1]
+                results[idx][1:] = freezing[1]
+                results[idx][0] = code
+    return results, groupings[1]
 
-def groups_to_df(groups, bin_size, total, key):
+def results_to_df(groups, bin_size, total, key):
     '''
-    Input: groups from folder_freezing(), bin_size in seconds, and total length
+    Input: results from folder_freezing(), bin_size in seconds, and total length
     of session, and dictionary containing groups corresponding to the
     coded group values
     Output: A Pandas DataFrame with records of each animal's freezing per bin
